@@ -15,8 +15,8 @@ import sklearn as skl
 ## ----------------------- CONFIG VALUES --------------------------------
 
 language = "English"
-basic_dataset = "data/dataset.csv"
-clean_dataset = "data/clean_dataset.csv"
+basic_dataset = "dataset.csv"
+clean_dataset = "clean_dataset.csv"
 separator = ";"
 
 ## ----------------------- CSV FILE COLUMNS -----------------------------
