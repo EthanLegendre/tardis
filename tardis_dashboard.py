@@ -70,7 +70,7 @@ if "Rate Cancel train" in fdf.columns:
 
 st.divider()
 
-tab1, tab2 = st.tabs(["📊 Overview", "🗺️ Stations"])
+tab1, tab2, tab3 = st.tabs(["📊 Overview", "🗺️ Stations", "🤖 Predict"])
 
 with tab1:
     col_a, col_b = st.columns(2)
@@ -142,3 +142,60 @@ with tab2:
         ax.set_xlabel("Avg delay (min)")
         st.pyplot(fig)
         plt.close()
+
+with tab3:
+    st.subheader("Predict arrival delay")
+ 
+    col_a, col_b = st.columns(2)
+    with col_a:
+        p_dep = st.selectbox("Departure station", departures)
+        p_arr = st.selectbox("Arrival station", arrivals)
+        p_svc = st.selectbox("Service", services if services else ["TGV"])
+    with col_b:
+        months = ["January", "February", "March", "April", "May", "June",
+                  "July", "August", "September", "October", "November", "December"]
+        p_month = st.selectbox("Month", months)
+        p_sched = st.number_input("Scheduled trains", 1, 5000, 100, 10)
+        p_time = st.number_input("Avg journey time (min)", 10, 600, 120, 5)
+ 
+    if st.button("Predict", type="primary"):
+        try:
+            row = pd.DataFrame([{
+                "Number of scheduled trains": p_sched,
+                "Month": p_month,
+                "Departure station": p_dep,
+                "Arrival station": p_arr,
+                "Average journey time": p_time,
+                "Service": p_svc,
+            }])
+            cats = ["Departure station", "Month", "Arrival station", "Service"]
+            row_enc = pd.get_dummies(row, columns=cats, drop_first=True)
+            train_cols = fallback_cols
+            if train_cols is None:
+                use = ["Number of scheduled trains", "Month", "Departure station",
+                       "Arrival station", "Average journey time", "Service"]
+                avail = [c for c in use if c in df.columns]
+                X_ref = pd.get_dummies(df[avail], columns=[c for c in cats if c in avail], drop_first=True)
+                train_cols = X_ref.columns.tolist()
+            row_enc = row_enc.reindex(columns=train_cols, fill_value=0)
+            pred = max(0, model.predict(row_enc)[0])
+            if pred < 15:
+                label = "Minimum delay ✅"
+            elif pred < 30:
+                label = "Low delay 🟡"
+            elif pred < 60:
+                label = "Medium delay 🟠"
+            else:
+                label = "Significant delay 🔴"
+            st.success(f"**Predicted delay: {pred:.1f} minutes** — {label}")
+            if hasattr(model, "feature_importances_"):
+                st.subheader("Top features")
+                imp = (pd.Series(model.feature_importances_, index=train_cols)
+                       .sort_values(ascending=False).head(10))
+                fig, ax = plt.subplots(figsize=(8, 3))
+                ax.barh(imp.index[::-1], imp.values[::-1], color="#e63946")
+                ax.set_xlabel("Importance")
+                st.pyplot(fig)
+                plt.close()
+        except Exception as e:
+            st.error(f"Prediction error: {e}")
