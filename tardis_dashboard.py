@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 import streamlit as st
+from sklearn.ensemble import RandomForestRegressor
 
 warnings.filterwarnings("ignore")
 
@@ -76,29 +77,30 @@ with tab1:
     col_a, col_b = st.columns(2)
 
     with col_a:
-        st.subheader("Delay distribution")
-        fig, ax = plt.subplots()
-        data = fdf["Average delay of all trains at arrival"].dropna()
-        ax.hist(data, bins=35, color="#e63946", edgecolor="white", linewidth=0.3)
-        ax.axvline(data.mean(), color="orange", linestyle="--", label=f"Mean: {data.mean():.1f} min")
-        ax.set_xlabel("Delay (minutes)")
-        ax.set_ylabel("Frequency")
-        ax.legend()
-        st.pyplot(fig)
-        plt.close()
-
-    with col_b:
-        st.subheader("Delay by month")
+        st.subheader("Average delay per month")
         if "Month" in fdf.columns:
             month_order = ["January", "February", "March", "April", "May", "June",
                            "July", "August", "September", "October", "November", "December"]
-            m_avg = (fdf.groupby("Month")["Average delay of all trains at arrival"]
-                     .mean()
-                     .reindex([m for m in month_order if m in fdf["Month"].values]))
-            fig, ax = plt.subplots()
-            ax.bar(m_avg.index, m_avg.values, color="#e63946")
+            fdf_month = fdf.copy()
+            fdf_month["Month"] = pd.Categorical(fdf_month["Month"], categories=month_order, ordered=True)
+            fig, ax = plt.subplots(figsize=(6, 4))
+            sns.barplot(data=fdf_month, x="Month", y="Average delay of all trains at arrival",
+                        errorbar=None, color="red", ax=ax)
+            ax.set_xlabel("")
             ax.set_ylabel("Avg delay (min)")
-            plt.xticks(rotation=40, ha="right", fontsize=8)
+            plt.xticks(rotation=35, ha="right", fontsize=7)
+            st.pyplot(fig)
+            plt.close()
+
+    with col_b:
+        st.subheader("Scheduled vs delayed trains")
+        if "Number of trains delayed at arrival" in fdf.columns:
+            fig, ax = plt.subplots(figsize=(6, 4))
+            sns.regplot(data=fdf, x="Number of scheduled trains",
+                        y="Number of trains delayed at arrival",
+                        color="red", scatter_kws={"s": 5, "alpha": 0.5}, ax=ax)
+            ax.set_xlabel("Scheduled trains")
+            ax.set_ylabel("Delayed trains")
             st.pyplot(fig)
             plt.close()
 
@@ -112,7 +114,7 @@ with tab1:
         "Average journey time",
     ] if c in fdf.columns]
     if len(num_cols) >= 3:
-        fig, ax = plt.subplots(figsize=(9, 5))
+        fig, ax = plt.subplots(figsize=(9, 4))
         sns.heatmap(fdf[num_cols].corr(), annot=True, fmt=".2f",
                     cmap="coolwarm", ax=ax, linewidths=0.5)
         plt.xticks(rotation=25, ha="right", fontsize=8)
@@ -145,7 +147,7 @@ with tab2:
 
 with tab3:
     st.subheader("Predict arrival delay")
- 
+
     col_a, col_b = st.columns(2)
     with col_a:
         p_dep = st.selectbox("Departure station", departures)
@@ -155,47 +157,50 @@ with tab3:
         months = ["January", "February", "March", "April", "May", "June",
                   "July", "August", "September", "October", "November", "December"]
         p_month = st.selectbox("Month", months)
-        p_sched = st.number_input("Scheduled trains", 1, 5000, 100, 10)
-        p_time = st.number_input("Avg journey time (min)", 10, 600, 120, 5)
- 
+        days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        p_day = st.selectbox("Day of the week", days)
+
     if st.button("Predict", type="primary"):
-        try:
-            row = pd.DataFrame([{
-                "Number of scheduled trains": p_sched,
-                "Month": p_month,
-                "Departure station": p_dep,
-                "Arrival station": p_arr,
-                "Average journey time": p_time,
-                "Service": p_svc,
-            }])
-            cats = ["Departure station", "Month", "Arrival station", "Service"]
-            row_enc = pd.get_dummies(row, columns=cats, drop_first=True)
-            train_cols = fallback_cols
-            if train_cols is None:
+        if model is None:
+            st.error("No model file found. Please add model.joblib to the project folder.")
+        else:
+            try:
+                row = pd.DataFrame([{
+                    "Month": p_month,
+                    "Departure station": p_dep,
+                    "Arrival station": p_arr,
+                    "Service": p_svc,
+                    "Day": p_day,
+                }])
+                cats = ["Departure station", "Month", "Arrival station", "Service", "Day"]
+                row_enc = pd.get_dummies(row, columns=cats, drop_first=True)
                 use = ["Number of scheduled trains", "Month", "Departure station",
                        "Arrival station", "Average journey time", "Service"]
                 avail = [c for c in use if c in df.columns]
-                X_ref = pd.get_dummies(df[avail], columns=[c for c in cats if c in avail], drop_first=True)
-                train_cols = X_ref.columns.tolist()
-            row_enc = row_enc.reindex(columns=train_cols, fill_value=0)
-            pred = max(0, model.predict(row_enc)[0])
-            if pred < 15:
-                label = "Minimum delay ✅"
-            elif pred < 30:
-                label = "Low delay 🟡"
-            elif pred < 60:
-                label = "Medium delay 🟠"
-            else:
-                label = "Significant delay 🔴"
-            st.success(f"**Predicted delay: {pred:.1f} minutes** — {label}")
-            if hasattr(model, "feature_importances_"):
-                st.subheader("Top features")
-                imp = (pd.Series(model.feature_importances_, index=train_cols)
-                       .sort_values(ascending=False).head(10))
-                fig, ax = plt.subplots(figsize=(8, 3))
-                ax.barh(imp.index[::-1], imp.values[::-1], color="#e63946")
-                ax.set_xlabel("Importance")
-                st.pyplot(fig)
-                plt.close()
-        except Exception as e:
-            st.error(f"Prediction error: {e}")
+                X_ref = pd.get_dummies(df[avail],
+                                       columns=[c for c in ["Departure station", "Month",
+                                                             "Arrival station", "Service"]
+                                                if c in avail],
+                                       drop_first=True)
+                row_enc = row_enc.reindex(columns=X_ref.columns.tolist(), fill_value=0)
+                pred = max(0, model.predict(row_enc)[0])
+                if pred < 15:
+                    label = "Minimum delay ✅"
+                elif pred < 30:
+                    label = "Low delay 🟡"
+                elif pred < 60:
+                    label = "Medium delay 🟠"
+                else:
+                    label = "Significant delay 🔴"
+                st.success(f"**Predicted delay: {pred:.1f} minutes** — {label}")
+                if hasattr(model, "feature_importances_"):
+                    st.subheader("Top features")
+                    imp = (pd.Series(model.feature_importances_, index=X_ref.columns)
+                           .sort_values(ascending=False).head(10))
+                    fig, ax = plt.subplots(figsize=(8, 3))
+                    ax.barh(imp.index[::-1], imp.values[::-1], color="#e63946")
+                    ax.set_xlabel("Importance")
+                    st.pyplot(fig)
+                    plt.close()
+            except Exception as e:
+                st.error(f"Prediction error: {e}")
