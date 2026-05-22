@@ -48,7 +48,7 @@ The dashboard has three tabs:
 
 ## Model
 
-- Algorithm: Random Forest Regressor (scikit-learn)
+- Algorithm: Ridge regressor (scikit-learn)
 - Target: Average delay of all trains at arrival
 
 ## Authors
