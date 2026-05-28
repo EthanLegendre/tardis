@@ -84,7 +84,7 @@ if "Rate Cancel train" in fdf.columns:
 
 st.divider()
 
-tab1, tab2, tab3 = st.tabs(["📊 Overview", "🗺️ Stations", "🤖 Predict"])
+tab1, tab2, tab3, tab4 = st.tabs(["📊 Overview", "🗺️ Stations", "🤖 Predict", "🧠 Quiz"])
 
 with tab1:
     col_a, col_b = st.columns(2)
@@ -310,3 +310,171 @@ with tab3:
                     plt.close()
             except Exception as e:
                 st.error(f"Prediction error: {e}")
+
+with tab4:
+    st.subheader("🧠 Train World Quiz")
+    st.markdown("Test your knowledge about world railways! Answer all questions then click **Submit**.")
+
+    quiz = [
+        {
+            "question": "What is the longest railway line in the world?",
+            "options": [
+                "The Trans-Siberian Railway (Russia)",
+                "The Indian Railway Main Line",
+                "The Canadian Pacific Railway",
+                "The Australian Indian Pacific",
+            ],
+            "answer": 0,
+            "explanation": "The Trans-Siberian Railway links Moscow to Vladivostok over 9,289 km, crossing 8 time zones.",
+            "stat": {
+                "label": "Trans-Siberian Railway",
+                "details": [
+                    ("Total length", "9,289 km"),
+                    ("Time zones crossed", "8"),
+                    ("Journey duration", "~6 days"),
+                    ("Countries", "Russia only"),
+                    ("Opened", "1916"),
+                ]
+            }
+        },
+        {
+            "question": "What is generally the most expensive train journey in the world?",
+            "options": [
+                "The Venice Simplon-Orient-Express (Europe)",
+                "The Blue Train (South Africa)",
+                "The Maharajas' Express (India)",
+                "The Rovos Rail Pride of Africa (South Africa)",
+            ],
+            "answer": 3,
+            "explanation": "The Rovos Rail Pride of Africa can cost over $10,000 per person for its longest itinerary.",
+            "stat": {
+                "label": "Most expensive train journeys",
+                "details": [
+                    ("Rovos Rail Pride of Africa", "~$10,000+/person"),
+                    ("Maharajas' Express", "~$5,000–$23,000/person"),
+                    ("Venice Simplon-Orient-Express", "~$2,000–$5,000/person"),
+                    ("The Blue Train", "~$1,000–$2,000/person"),
+                ]
+            }
+        },
+        {
+            "question": "What is the oldest steam locomotive still in working order?",
+            "options": [
+                "The Rocket (1829, UK)",
+                "Puffing Billy (1813, UK)",
+                "The Fairy Queen (1855, India)",
+                "The Locomotion No.1 (1825, UK)",
+            ],
+            "answer": 2,
+            "explanation": "The Fairy Queen (1855) holds the Guinness World Record as the oldest working steam locomotive.",
+            "stat": {
+                "label": "The Fairy Queen",
+                "details": [
+                    ("Built", "1855"),
+                    ("Built by", "Kitson Thompson & Hewitson, UK"),
+                    ("Now operating in", "India (Delhi → Alwar)"),
+                    ("Record", "Guinness World Record — oldest working loco"),
+                    ("Age", "~170 years old"),
+                ]
+            }
+        },
+        {
+            "question": "Who is credited with inventing the first steam locomotive?",
+            "options": [
+                "James Watt",
+                "George Stephenson",
+                "Richard Trevithick",
+                "Robert Fulton",
+            ],
+            "answer": 2,
+            "explanation": "Richard Trevithick built the first full-scale working railway steam locomotive in 1804 in Wales, UK.",
+            "stat": {
+                "label": "Richard Trevithick",
+                "details": [
+                    ("Born", "1771, Cornwall, UK"),
+                    ("First locomotive", "1804 — Merthyr Tydfil, Wales"),
+                    ("Speed of first run", "~8 km/h"),
+                    ("Passengers carried", "70 people on first run"),
+                    ("Died", "1833"),
+                ]
+            }
+        },
+        {
+            "question": "What is the fastest train in the world (commercial service)?",
+            "options": [
+                "TGV (France)",
+                "Shinkansen N700S (Japan)",
+                "Shanghai Maglev (China)",
+                "Frecciarossa 1000 (Italy)",
+            ],
+            "answer": 2,
+            "explanation": "The Shanghai Maglev reaches 430 km/h in commercial service.",
+            "stat": {
+                "label": "Speed comparison",
+                "details": [
+                    ("Shanghai Maglev (China)", "430 km/h"),
+                    ("Frecciarossa 1000 (Italy)", "360 km/h"),
+                    ("TGV (France)", "320 km/h (record: 574 km/h in tests)"),
+                    ("Shinkansen N700S (Japan)", "285 km/h"),
+                    ("Eurostar (UK/France)", "300 km/h"),
+                ]
+            }
+        },
+    ]
+    if "quiz_submitted" not in st.session_state:
+        st.session_state.quiz_submitted = False
+    if "quiz_answers" not in st.session_state:
+        st.session_state.quiz_answers = {}
+
+    with st.form("quiz_form"):
+        for i, q in enumerate(quiz):
+            st.markdown(f"**Question {i+1} — {q['question']}**")
+            st.session_state.quiz_answers[i] = st.radio(
+                label=f"q{i}",
+                options=q["options"],
+                index=None,
+                label_visibility="collapsed",
+                key=f"q_{i}",
+            )
+            st.markdown("")
+
+        submitted = st.form_submit_button("✅ Submit my answers", type="primary")
+
+    if submitted:
+        score = 0
+        st.divider()
+        st.subheader("📋 Results")
+
+        for i, q in enumerate(quiz):
+            user_choice = st.session_state.quiz_answers.get(i)
+            correct_option = q["options"][q["answer"]]
+
+            col_result, col_stat = st.columns([1, 1])
+
+            with col_result:
+                if user_choice == correct_option:
+                    score += 1
+                    st.success(f"**Q{i+1}** ✅ Correct!\n\n_{q['explanation']}_")
+                elif user_choice is None:
+                    st.warning(f"**Q{i+1}** ⚠️ No answer.\n\nCorrect: *{correct_option}*")
+                else:
+                    st.error(f"**Q{i+1}** ❌ Wrong.\n\nYou answered: *{user_choice}*\n\n *{correct_option}* — {q['explanation']}")
+
+            with col_stat:
+                stat = q["stat"]
+                st.markdown(f"**{stat['label']}**")
+                for k, v in stat["details"]:
+                    st.markdown(f"- **{k}:** {v}")
+
+            st.divider()
+
+        pct = int(score / len(quiz) * 100)
+        if pct == 100:
+            st.balloons()
+            st.success(f"Perfect score! {score}/{len(quiz)} — You're a true rail expert!")
+        elif pct >= 66:
+            st.info(f"Good job! {score}/{len(quiz)} — You know your trains well.")
+        elif pct >= 33:
+            st.warning(f"Not bad! {score}/{len(quiz)} — A bit more study and you'll ace it.")
+        else:
+            st.error(f"{score}/{len(quiz)} — Time to hop on the Trans-Siberian and learn along the way!")
