@@ -1,4 +1,4 @@
-# TARDIS — TGV Delay Prediction
+# TARDIS — TGV Delay Prediction 🚆
 
 TARDIS is a machine learning project that predicts TGV arrival delays based on SNCF historical data. It includes an exploratory data analysis notebook, a trained Random Forest model, and an interactive Streamlit dashboard.
 
